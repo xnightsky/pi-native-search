@@ -101,7 +101,11 @@ const PROVIDERS: Record<
   },
   deepseek: {
     name: "DeepSeek",
-    nativeSearch: false,
+    // DeepSeek's native web search is only exposed on its Anthropic-compatible
+    // endpoint (https://api.deepseek.com/anthropic) via server_tool_use /
+    // web_search_tool_result — the OpenAI-compatible /v1 surface doesn't have it.
+    // The case "deepseek" in doSearch routes it through the Anthropic web_search path.
+    nativeSearch: true,
     nativeFetch: false,
     envKey: "DEEPSEEK_API_KEY",
   },
@@ -372,6 +376,10 @@ async function anthropicSearch(
   apiKey: string,
   baseUrl: string,
   signal?: AbortSignal,
+  // Optional tool_choice, only passed by the case "deepseek" in doSearch.
+  // The real Anthropic provider never passes it, so its request body stays
+  // byte-identical to upstream (this parameter has zero effect on anthropic).
+  toolChoice?: unknown,
 ): Promise<string> {
   const url = baseUrl
     ? `${baseUrl.replace(/\/+$/, "")}/v1/messages`
@@ -389,6 +397,8 @@ async function anthropicSearch(
       max_tokens: 4096,
       messages: [{ role: "user", content: query }],
       tools: [{ type: "web_search_20250305", name: "web_search" }],
+      // Only add tool_choice when explicitly passed (DeepSeek; see case "deepseek" below).
+      ...(toolChoice ? { tool_choice: toolChoice } : {}),
     }),
   });
   if (!res.ok)
@@ -754,6 +764,27 @@ async function httpFetch(url: string, signal?: AbortSignal): Promise<string> {
   );
 }
 
+// ─── DeepSeek tool-markup cleanup ─────────────────────────────────────
+//
+// DeepSeek V4's Anthropic endpoint has a known bug (cherry-studio#14714,
+// marked P0 / NVIDIA forums): during web_search it leaks the native tool-call
+// markup `<｜｜DSML｜｜tool_calls>…` (｜ = U+FF5C fullwidth vertical line)
+// into text blocks instead of the endpoint parsing it as a server tool call.
+// The root cause is endpoint-side (we can't fix it), so strip it here as a
+// fallback: remove whole tool_calls blocks first, then any residual DSML tags.
+// Together with the tool_choice prevention in case "deepseek" this forms a
+// prevent + clean double layer.
+function stripDeepseekToolMarkup(text: string): string {
+  return text
+    .replace(
+      /<｜｜DSML｜｜tool_calls>[\s\S]*?<\/｜｜DSML｜｜tool_calls>/g,
+      "",
+    )
+    .replace(/<\/?｜｜DSML｜｜[^>]*>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 async function doSearch(
@@ -783,6 +814,29 @@ async function doSearch(
           return {
             text: await anthropicSearch(query, model, apiKey!, baseUrl, signal),
           };
+        case "deepseek": {
+          // Reuse the Anthropic web_search path, pinned to DeepSeek's
+          // Anthropic-compatible endpoint (not the /v1 baseUrl from ctx).
+          // Same Messages protocol: tools:[{type:"web_search_20250305"}]
+          // → web_search_tool_result.
+          //
+          // DSML leak defense (see stripDeepseekToolMarkup above):
+          //   1. tool_choice forces web_search only — verified in live smoke
+          //      tests to eliminate the leak (baseline leaks, tool_choice does
+          //      not; verified on deepseek-v4-flash);
+          //   2. stripDeepseekToolMarkup strips any residue (the bug is
+          //      probabilistic and may regress in future models); if stripping
+          //      leaves nothing, fall back to "No results found.".
+          const raw = await anthropicSearch(
+            query,
+            model,
+            apiKey!,
+            "https://api.deepseek.com/anthropic",
+            signal,
+            { type: "tool", name: "web_search" },
+          );
+          return { text: stripDeepseekToolMarkup(raw) || "No results found." };
+        }
         case "claude-bridge":
           return { text: await claudeBridgeSearch(query, signal) };
       }
