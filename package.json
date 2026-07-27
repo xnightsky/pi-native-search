@@ -1,6 +1,6 @@
 {
-  "name": "pi-native-search",
-  "version": "0.1.0",
+  "name": "@xnightsky/pi-native-search",
+  "version": "0.1.0-patch.1",
   "private": false,
   "description": "Pi extension that adds web_search and web_fetch tools using each provider's native search backend (ZAI MCP, Anthropic, Google, OpenAI, xAI, Claude Code subscription via claude-bridge), with DuckDuckGo as a universal fallback.",
   "keywords": [
@@ -18,11 +18,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smalibary/pi-native-search.git"
+    "url": "git+https://github.com/xnightsky/pi-native-search.git"
   },
-  "homepage": "https://github.com/smalibary/pi-native-search#readme",
+  "homepage": "https://github.com/xnightsky/pi-native-search#readme",
   "bugs": {
-    "url": "https://github.com/smalibary/pi-native-search/issues"
+    "url": "https://github.com/xnightsky/pi-native-search/issues"
   },
   "engines": {
     "node": ">=20"
