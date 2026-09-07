@@ -1,7 +1,7 @@
 # pi-native-search
 
-[![npm version](https://img.shields.io/npm/v/pi-native-search)](https://www.npmjs.com/package/pi-native-search)
-[![license](https://img.shields.io/npm/l/pi-native-search)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@xnightsky/pi-native-search)](https://www.npmjs.com/package/@xnightsky/pi-native-search)
+[![license](https://img.shields.io/npm/l/@xnightsky/pi-native-search)](LICENSE)
 
 A [pi](https://github.com/badlogic/pi-mono) extension that adds `web_search` and `web_fetch` tools, routing each call through the **active provider's own native search backend** when available, and falling back to DuckDuckGo HTML scraping otherwise.
 
@@ -28,8 +28,10 @@ Pi ships with provider plumbing but no built-in search. Most extensions either (
 ## Install
 
 ```bash
-pi install npm:pi-native-search
+pi install npm:@xnightsky/pi-native-search
 ```
+
+> **Note:** The original [`pi-native-search`](https://www.npmjs.com/package/pi-native-search) package is no longer maintained. This README points to the community patch release [`@xnightsky/pi-native-search`](https://www.npmjs.com/package/@xnightsky/pi-native-search), which continues fixes on top of the original codebase.
 
 The extension auto-detects your active provider via pi's `ctx.model.provider` and picks the right backend on every call.
 
