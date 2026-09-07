@@ -9,7 +9,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # 创建 GitHub Release 需要
       id-token: write # npm --provenance 签名需要
     steps:
       - uses: actions/checkout@v4
@@ -22,3 +22,8 @@ jobs:
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 按 tag 自动创建 GitHub Release，根据 commit/PR 生成 changelog 笔记
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
