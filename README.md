@@ -19,6 +19,8 @@ Pi ships with provider plumbing but no built-in search. Most extensions either (
 | **google** (Gemini) | `google_search` grounding tool | `GEMINI_API_KEY` |
 | **openai** | Responses API `web_search` tool | `OPENAI_API_KEY` |
 | **xai** (Grok) | Responses API `web_search` tool | `XAI_API_KEY` |
+| **deepseek** | `web_search_20250305` via the Anthropic-compatible endpoint (`api.deepseek.com/anthropic`) | `DEEPSEEK_API_KEY` |
+| **kimi-coding** (Kimi for Coding subscription) | `web_search_20250305` via the Anthropic-compatible endpoint (`api.kimi.com/coding`) | pi OAuth login (`kimi-coding` in auth.json) |
 | All other providers | DuckDuckGo HTML fallback | none |
 
 `web_fetch` uses the same routing — currently only `claude-bridge` has a native backend; everything else uses a built-in HTTP fetcher.

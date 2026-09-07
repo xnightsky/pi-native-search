@@ -163,6 +163,16 @@ const PROVIDERS: Record<
     nativeFetch: false,
     envKey: "KIMI_API_KEY",
   },
+  "kimi-coding": {
+    name: "Kimi for Coding",
+    // kimi.com/coding is an Anthropic-compatible endpoint that supports the
+    // web_search_20250305 server tool (live-verified: server_tool_use +
+    // web_search_tool_result blocks with standard web_search_result items).
+    // Auth is OAuth Bearer (subscription) from auth.json, not an API key.
+    nativeSearch: true,
+    nativeFetch: false,
+    envKey: "",
+  },
   minimax: {
     name: "MiniMax",
     nativeSearch: false,
@@ -227,6 +237,23 @@ function getApiKey(provider: string): string | undefined {
       const entry = JSON.parse(readFileSync(authPath, "utf-8"))[provider];
       if (entry?.type === "api_key" && entry.key && !entry.key.startsWith("!"))
         return entry.key;
+    }
+  } catch {}
+  return undefined;
+}
+
+/** OAuth access token (e.g. kimi-coding subscription auth) */
+function getOAuthToken(provider: string): string | undefined {
+  try {
+    const authPath = join(getAgentDir(), "auth.json");
+    if (existsSync(authPath)) {
+      const entry = JSON.parse(readFileSync(authPath, "utf-8"))[provider];
+      if (
+        entry?.type === "oauth" &&
+        entry.access &&
+        (!entry.expires || entry.expires > Date.now())
+      )
+        return entry.access;
     }
   } catch {}
   return undefined;
@@ -380,6 +407,8 @@ async function anthropicSearch(
   // The real Anthropic provider never passes it, so its request body stays
   // byte-identical to upstream (this parameter has zero effect on anthropic).
   toolChoice?: unknown,
+  // Use Authorization: Bearer instead of x-api-key (kimi-coding OAuth).
+  bearer = false,
 ): Promise<string> {
   const url = baseUrl
     ? `${baseUrl.replace(/\/+$/, "")}/v1/messages`
@@ -389,7 +418,7 @@ async function anthropicSearch(
     signal,
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
+      ...(bearer ? { Authorization: `Bearer ${apiKey}` } : { "x-api-key": apiKey }),
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -797,8 +826,9 @@ async function doSearch(
   const apiKey = getApiKey(provider);
   const cap = PROVIDERS[provider];
   // claude-bridge uses the `claude` CLI's own subscription auth, so it doesn't
-  // need an api_key in pi's auth.json.
-  const hasAuth = !!apiKey || provider === "claude-bridge";
+  // need an api_key in pi's auth.json; kimi-coding uses an OAuth access token.
+  const hasAuth =
+    !!apiKey || provider === "claude-bridge" || !!getOAuthToken(provider);
   if (cap?.nativeSearch && hasAuth) {
     try {
       switch (provider) {
@@ -836,6 +866,22 @@ async function doSearch(
             { type: "tool", name: "web_search" },
           );
           return { text: stripDeepseekToolMarkup(raw) || "No results found." };
+        }
+        case "kimi-coding": {
+          // Anthropic-compatible endpoint; OAuth Bearer token (subscription).
+          const token = getOAuthToken(provider);
+          if (!token) throw new Error("kimi-coding: no valid OAuth access token");
+          return {
+            text: await anthropicSearch(
+              query,
+              model,
+              token,
+              baseUrl || "https://api.kimi.com/coding",
+              signal,
+              undefined,
+              true,
+            ),
+          };
         }
         case "claude-bridge":
           return { text: await claudeBridgeSearch(query, signal) };
@@ -897,7 +943,9 @@ export default function searchExtension(pi: ExtensionAPI) {
       const cap = PROVIDERS[provider];
       const hasNative =
         !!cap?.nativeSearch &&
-        (!!getApiKey(provider) || provider === "claude-bridge");
+        (!!getApiKey(provider) ||
+          provider === "claude-bridge" ||
+          !!getOAuthToken(provider));
       onUpdate?.({
         content: [
           {

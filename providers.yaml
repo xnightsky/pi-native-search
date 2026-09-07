@@ -102,6 +102,14 @@ providers:
     native_search: false
     native_fetch: false
 
+  kimi-coding:
+    name: "Kimi for Coding"
+    native_search: true
+    native_fetch: false
+    # Anthropic-compatible endpoint (api.kimi.com/coding) supports the
+    # web_search_20250305 server tool; OAuth subscription auth (Bearer)
+    search_type: "anthropic_web_search"
+
   minimax:
     name: "MiniMax"
     native_search: false
